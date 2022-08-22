@@ -49,7 +49,7 @@ class DualGantryCoreXYKinematics:
         self.printer.lookup_object('gcode').register_command(
                 'SET_DUAL_CARRIAGE', self.cmd_SET_DUAL_CARRIAGE,
                 desc=self.cmd_SET_DUAL_CARRIAGE_help)
-        self.last_inactive_xy_position = None # (x, y)
+        self.last_inactive_position = None # (x, y)
 
     def get_steppers(self):
         return [s for rail in self.rails for s in rail.get_steppers()]
@@ -126,15 +126,15 @@ class DualGantryCoreXYKinematics:
             toolhead = self.printer.lookup_object('toolhead')
             toolhead.flush_step_generation()
             # Inactivate other rails
-            if self.last_inactive_xy_position is None:
+            if self.last_inactive_position is None:
                 xy_position_to_restore = toolhead.get_position()[:2]
             else:
-                xy_position_to_restore = self.last_inactive_xy_position
+                xy_position_to_restore = self.last_inactive_position
             for i, r in enumerate( self.dualgantry_rails[( carriage + 1) % 2]):
                 r.set_trapq(None)
                 self.rails[i + 3] = r
                 # Save position value for a future toolchange
-                self.last_inactive_xy_position = toolhead.get_position()[:2]
+                self.last_inactive_position = toolhead.get_position()[:2]
             # Activate carriage rails
             rails = self.dualgantry_rails[carriage]
             ranges = [r.get_range() for r in rails]
