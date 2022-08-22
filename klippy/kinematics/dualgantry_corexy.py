@@ -35,7 +35,6 @@ class DualGantryCoreXYKinematics:
         self.rails[4].set_trapq(None)
         self.dualgantry_rails = ( (self.rails[0], self.rails[1]),
                                   (self.rails[3], self.rails[4]) )
-        self.active_carriage = 0
         ranges = [r.get_range() for r in self.rails]
         self.axes_min = toolhead.Coord(*[r[0] for r in ranges[:3]], e=0.)
         self.axes_max = toolhead.Coord(*[r[1] for r in ranges[:3]], e=0.)
@@ -46,10 +45,11 @@ class DualGantryCoreXYKinematics:
         self.max_z_accel = config.getfloat(
             'max_z_accel', max_accel, above=0., maxval=max_accel)
         self.limits = [(1.0, -1.0)] * 3
+        self.active_carriage = 0
+        self.last_inactive_position = None
         self.printer.lookup_object('gcode').register_command(
                 'SET_DUAL_CARRIAGE', self.cmd_SET_DUAL_CARRIAGE,
                 desc=self.cmd_SET_DUAL_CARRIAGE_help)
-        self.last_inactive_position = None # (x, y)
 
     def get_steppers(self):
         return [s for rail in self.rails for s in rail.get_steppers()]
