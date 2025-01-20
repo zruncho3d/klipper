@@ -61,6 +61,10 @@ class DualGantryCoreXYKinematics:
             rail.set_position(newpos)
             if i in homing_axes:
                 self.limits[i] = rail.get_range()
+    def clear_homing_state(self, axes):
+        for i, _ in enumerate(self.limits):
+            if i in axes:
+                self.limits[i] = (1.0, -1.0)
     def note_z_not_homed(self):
         # Helper for Safe Z Home
         self.limits[2] = (1.0, -1.0)
