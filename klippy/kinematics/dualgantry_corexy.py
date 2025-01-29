@@ -9,6 +9,7 @@ import stepper
 
 class DualGantryCoreXYKinematics:
     def __init__(self, toolhead, config):
+
         self.printer = config.get_printer()
         # Setup axis rails
         self.rails = [stepper.LookupMultiRail(config.getsection('stepper_' + n))
@@ -29,8 +30,6 @@ class DualGantryCoreXYKinematics:
         for s in self.get_steppers():
             s.set_trapq(toolhead.get_trapq())
             toolhead.register_step_generator(s.generate_steps)
-        config.get_printer().register_event_handler("stepper_enable:motor_off",
-                                                    self._motor_off)
         self.rails[3].set_trapq(None)
         self.rails[4].set_trapq(None)
         self.dualgantry_rails = ( (self.rails[0], self.rails[1]),
@@ -45,6 +44,7 @@ class DualGantryCoreXYKinematics:
         self.max_z_accel = config.getfloat(
             'max_z_accel', max_accel, above=0., maxval=max_accel)
         self.limits = [(1.0, -1.0)] * 3
+        self.saved_limits = [self.limits] *2
         self.active_carriage = 0
         self.last_inactive_position = None
         self.printer.lookup_object('gcode').register_command(
@@ -59,12 +59,19 @@ class DualGantryCoreXYKinematics:
     def set_position(self, newpos, homing_axes):
         for i, rail in enumerate(self.rails):
             rail.set_position(newpos)
-            if i in homing_axes:
-                self.limits[i] = rail.get_range()
-    def clear_homing_state(self, axes):
-        for i, _ in enumerate(self.limits):
-            if i in axes:
-                self.limits[i] = (1.0, -1.0)
+            logging.info("rail %s: limit:  %s", rail.get_name(), rail.get_range())
+            if "xyzuv"[i] in homing_axes:
+                    self.limits[i] = rail.get_range()
+                    logging.info("updated limits for T%d for axis %s with %s",self.active_carriage, "xyz"[i ], self.limits[i])
+    def clear_homing_state(self, clear_axes):
+        for axis, axis_name in enumerate("xyz"):
+            if axis_name in clear_axes:
+                logging.debug("Resetting T%s : axis %s",self.active_carriage, axis_name)
+                self.limits[axis] = (1.0, -1.0)
+                if axis in [0,1]:
+                    self.saved_limits[0][axis] = (1.0, -1.0)
+                    self.saved_limits[1][axis] = (1.0, -1.0)
+
     def note_z_not_homed(self):
         # Helper for Safe Z Home
         self.limits[2] = (1.0, -1.0)
@@ -91,8 +98,6 @@ class DualGantryCoreXYKinematics:
                 self._activate_gantry(altc)
             else:
                 self._home_axis(homing_state, axis, self.rails[axis])
-    def _motor_off(self, print_time):
-        self.limits = [(1.0, -1.0)] * 3
     def _check_endstops(self, move):
         end_pos = move.end_pos
         for i in range(3):
@@ -134,11 +139,15 @@ class DualGantryCoreXYKinematics:
                 xy_position_to_restore = toolhead.get_position()[:2]
             else:
                 xy_position_to_restore = self.last_inactive_position
-            for i, r in enumerate( self.dualgantry_rails[( carriage + 1) % 2]):
+            for i, r in enumerate( self.dualgantry_rails[( carriage + 1) % 2]):  # just setting the other ( != carriage ) rails off
                 r.set_trapq(None)
                 self.rails[i + 3] = r
                 # Save position value for a future toolchange
                 self.last_inactive_position = toolhead.get_position()[:2]
+
+            # store x / y limits
+            self.saved_limits[self.active_carriage][0] = self.limits[0]
+            self.saved_limits[self.active_carriage][1] = self.limits[1]
             # Activate carriage rails
             rails = self.dualgantry_rails[carriage]
             ranges = [r.get_range() for r in rails]
@@ -150,6 +159,9 @@ class DualGantryCoreXYKinematics:
                 r.set_trapq(toolhead.get_trapq())
                 self.rails[i] = r
             pos = toolhead.get_position()
+            # restore old limits
+            self.limits[0] = self.saved_limits[carriage][0]
+            self.limits[1] = self.saved_limits[carriage][1]
             for i, r in enumerate(rails):
                 if self.limits[i][0] <= self.limits[i][1]:
                     self.limits[i] = ranges[i]
