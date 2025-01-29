@@ -57,8 +57,7 @@ class DualGantryCoreXYKinematics:
     def set_position(self, newpos, homing_axes):
         for i, rail in enumerate(self.rails):
             rail.set_position(newpos)
-            logging.info("rail %s: limit:  %s", rail.get_name(), rail.get_range())
-            if "xyzuv"[i] in homing_axes:
+            if "xyzuv"[i] in homing_axes:  # uv are unused, but loop goes from 0 to 4
                     self.limits[i] = rail.get_range()
     def clear_homing_state(self, clear_axes):
         for axis, axis_name in enumerate("xyz"):
@@ -131,7 +130,7 @@ class DualGantryCoreXYKinematics:
                 xy_position_to_restore = toolhead.get_position()[:2]
             else:
                 xy_position_to_restore = self.last_inactive_position
-            for i, r in enumerate( self.dualgantry_rails[( carriage + 1) % 2]):  # just setting the other ( != carriage ) rails off
+            for i, r in enumerate( self.dualgantry_rails[( carriage + 1) % 2]):
                 r.set_trapq(None)
                 self.rails[i + 3] = r
                 # Save position value for a future toolchange
