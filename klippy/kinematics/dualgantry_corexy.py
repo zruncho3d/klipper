@@ -29,8 +29,6 @@ class DualGantryCoreXYKinematics:
         for s in self.get_steppers():
             s.set_trapq(toolhead.get_trapq())
             toolhead.register_step_generator(s.generate_steps)
-        config.get_printer().register_event_handler("stepper_enable:motor_off",
-                                                    self._motor_off)
         self.rails[3].set_trapq(None)
         self.rails[4].set_trapq(None)
         self.dualgantry_rails = ( (self.rails[0], self.rails[1]),
@@ -59,8 +57,12 @@ class DualGantryCoreXYKinematics:
     def set_position(self, newpos, homing_axes):
         for i, rail in enumerate(self.rails):
             rail.set_position(newpos)
-            if i in homing_axes:
-                self.limits[i] = rail.get_range()
+            if "xyzuv"[i] in homing_axes:  # uv are unused, but loop goes from 0 to 4
+                    self.limits[i] = rail.get_range()
+    def clear_homing_state(self, clear_axes):
+        for axis, axis_name in enumerate("xyz"):
+            if axis_name in clear_axes:
+                self.limits[axis] = (1.0, -1.0)
     def note_z_not_homed(self):
         # Helper for Safe Z Home
         self.limits[2] = (1.0, -1.0)
@@ -87,8 +89,6 @@ class DualGantryCoreXYKinematics:
                 self._activate_gantry(altc)
             else:
                 self._home_axis(homing_state, axis, self.rails[axis])
-    def _motor_off(self, print_time):
-        self.limits = [(1.0, -1.0)] * 3
     def _check_endstops(self, move):
         end_pos = move.end_pos
         for i in range(3):
